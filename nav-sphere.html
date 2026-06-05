@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>导航球转场 — 阶段1+2</title>
+<style>
+:root {
+  --cyan: #00d4ff;
+  --orange: #ff6b35;
+  --bg: #030712;
+  --text: #e8e8f8;
+  --text2: #b0b0d4;
+  --card: rgba(8,10,26,.94);
+  --border: rgba(0,212,255,.18);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden;
+  user-select: none; -webkit-user-select: none;
+}
+
+.page {
+  position: fixed; inset: 0; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s;
+}
+.page-title {
+  font-size: 2rem; font-weight: 800; letter-spacing: -.5px;
+  background: linear-gradient(135deg, var(--cyan), #7b40ff);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 8px;
+}
+.page-sub {
+  font-size: .75rem; color: var(--text2); letter-spacing: 6px;
+  margin-bottom: 40px;
+}
+.page-nav {
+  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+  max-width: 540px;
+}
+.page-nav a {
+  padding: 7px 14px; border-radius: 4px; font-size: .65rem;
+  color: var(--text2); text-decoration: none;
+  border: 1px solid var(--border); letter-spacing: 1px;
+  transition: .2s; cursor: pointer;
+}
+.page-nav a:hover {
+  border-color: var(--cyan); color: var(--cyan);
+  box-shadow: 0 0 18px rgba(0,212,255,.15);
+}
+
+.black-overlay {
+  position: fixed; inset: 0; z-index: 10;
+  background: #000;
+  clip-path: circle(0px at 50% 50%);
+  pointer-events: none;
+}
+
+#dotsCanvas {
+  position: fixed; inset: 0; z-index: 11;
+  pointer-events: none; opacity: 0;
+}
+#ringCanvas {
+  position: fixed; inset: 0; z-index: 15;
+  pointer-events: none; opacity: 0;
+}
+
+.sphere-layer {
+  position: fixed; inset: 0; z-index: 12;
+  pointer-events: none; opacity: 0;
+}
+.sphere-layer canvas {
+  display: block;
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed;
+  top: 0; left: 0;
+}
+
+.dot-label {
+  position: fixed;
+  z-index: 13;
+  pointer-events: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  background: rgba(0, 10, 30, 0.85);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.15);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.dot-label.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ctrl {
+  position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 20; display: flex; gap: 10px;
+}
+.btn {
+  padding: 10px 22px; border: none; border-radius: 6px;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  letter-spacing: 1px; font-family: inherit; transition: .25s;
+}
+.btn-go {
+  background: linear-gradient(135deg, var(--cyan), #7b40ff);
+  color: #fff; box-shadow: 0 4px 24px rgba(0,212,255,.4);
+}
+.btn-go:hover { box-shadow: 0 6px 32px rgba(0,212,255,.55); transform: translateY(-2px); }
+.btn-reset {
+  background: transparent; color: var(--text2);
+  border: 1px solid var(--border);
+}
+.btn-reset:hover { border-color: var(--cyan); color: var(--cyan); }
+
+.status {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 20; font-size: .7rem; color: var(--text2);
+  letter-spacing: 2px; opacity: .5;
+}
+
+.orbit-hint {
+  position: fixed;
+  top: 70px; left: 50%; transform: translateX(-50%);
+  z-index: 20; font-size: .65rem; color: var(--cyan);
+  letter-spacing: 1px; opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+.orbit-hint.visible { opacity: 0.7; }
+
+#flyCanvas {
+  position: fixed; inset: 0; z-index: 14;
+  pointer-events: none; opacity: 0;
+}
+</style>
+</head>
+<body>
+
+<div class="ctrl">
+  <button class="btn btn-go" id="btnStart">触发转场 → 项目作品</button>
+  <button class="btn btn-reset" id="btnReset">重置</button>
+</div>
+<div class="status" id="status">点击按钮触发正向转场动画</div>
+<div class="orbit-hint" id="orbitHint">🔄 拖拽旋转球体 · 双击退出</div>
+
+<div class="black-overlay" id="blackOverlay"></div>
+<div class="page" id="pageA">
+  <div class="page-title">陈怡丞 | 个人网站</div>
+  <div class="page-sub">SOFTWARE ENGINEERING</div>
+  <div class="page-nav">
+    <a>星图</a><a>个人介绍</a><a>Pawn</a><a>项目作品</a>
+    <a>获奖荣誉</a><a>竞赛活动</a><a>校园生活</a><a>社团任职</a>
+  </div>
+</div>
+
+<div class="page" id="pageB" style="visibility:hidden;opacity:0;">
+  <div class="page-title">项目作品</div>
+  <div class="page-sub">PROJECTS</div>
+  <div class="page-nav">
+    <a>伪3D网站</a><a>Pawn场景</a><a>智能体大赛</a><a>折叠盒子</a>
+  </div>
+</div>
+
+<div class="black-overlay" id="blackOverlay"></div>
+<canvas id="dotsCanvas"></canvas>
+<canvas id="flyCanvas"></canvas>
+<canvas id="ringCanvas"></canvas>
+<div class="sphere-layer" id="sphereLayer"></div>
+<div class="dot-label" id="dotLabel"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(() => {
+
+const pageA = document.getElementById('pageA');
+const pageB = document.getElementById('pageB');
+const blackOverlay = document.getElementById('blackOverlay');
+const dotsCanvas = document.getElementById('dotsCanvas');
+const ctx = dotsCanvas.getContext('2d');
+const ringCanvasEl = document.getElementById('ringCanvas');
+const ringCtx = ringCanvasEl.getContext('2d');
+const flyCanvasEl = document.getElementById('flyCanvas');
+const flyCtx = flyCanvasEl.getContext('2d');
+const sphereLayer = document.getElementById('sphereLayer');
+const statusEl = document.getElementById('status');
+const orbitHint = document.getElementById('orbitHint');
+const dotLabelEl = document.getElementById('dotLabel');
+
+function resizeCanvas() {
+  dotsCanvas.width = window.innerWidth;
+  dotsCanvas.height = window.innerHeight;
+  ringCanvasEl.width = window.innerWidth;
+  ringCanvasEl.height = window.innerHeight;
+  flyCanvasEl.width = window.innerWidth;
+  flyCanvasEl.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const W = () => window.innerWidth;
+const H = () => window.innerHeight;
+const CX = () => W() / 2;
+const CY = () => H() / 2;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, W() / Math.max(H(), 1), 0.1, 20);
+camera.position.set(0, 0, 6);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+sphereLayer.appendChild(renderer.domElement);
+
+function resizeThree() {
+  const w = W(), h = H();
+  renderer.setSize(w, h);
+  camera.aspect = w / Math.max(h, 1);
+  camera.updateProjectionMatrix();
+}
+resizeThree();
+window.addEventListener('resize', resizeThree);
+
+const sphereGroup = new THREE.Group();
+sphereGroup.rotation.order = 'YXZ'; // Y为主轴，更适合球体导航旋转
+scene.add(sphereGroup);
+
+const sphereGeo = new THREE.SphereGeometry(1.2, 48, 36);
+
+const solidMat = new THREE.MeshPhongMaterial({
+  color: 0x041828,
+  transparent: true,
+  opacity: 0.55,
+  side: THREE.FrontSide,
+  shininess: 60,
+  specular: 0x00d4ff,
+});
+const solidShell = new THREE.Mesh(sphereGeo, solidMat);
+sphereGroup.add(solidShell);
+
+const wireMat = new THREE.MeshBasicMaterial({
+  color: 0x00d4ff, wireframe: true, transparent: true, opacity: 0.12,
+});
+const wireShell = new THREE.Mesh(new THREE.SphereGeometry(1.205, 32, 24), wireMat);
+sphereGroup.add(wireShell);
+
+const innerMat = new THREE.MeshBasicMaterial({
+  color: 0x00a0cc, transparent: true, opacity: 0.04,
+});
+const innerShell = new THREE.Mesh(new THREE.SphereGeometry(1.15, 32, 24), innerMat);
+sphereGroup.add(innerShell);
+
+const ringGeo = new THREE.TorusGeometry(1.21, 0.015, 16, 80);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.5 });
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.rotation.x = Math.PI / 2;
+sphereGroup.add(ring);
+
+const ring2 = new THREE.Mesh(
+  new THREE.TorusGeometry(1.21, 0.01, 16, 64),
+  new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.25 })
+);
+ring2.rotation.x = Math.PI / 3;
+ring2.rotation.y = Math.PI / 6;
+sphereGroup.add(ring2);
+
+const dotData = [
+  { theta: 0,          phi: 0,     label: 'Pawn',    href: 'pawn.html' },
+  { theta: Math.PI,    phi: 0.3,   label: '首页',    href: 'index.html' },
+  { theta: 3.4,        phi: -0.35, label: '试验地',   href: 'lab.html' },
+  { theta: 3.93,       phi: 0.45,  label: '项目作品', href: 'projects.html' },
+  { theta: -Math.PI/2, phi: -0.2,  label: '获奖荣誉', href: 'awards.html' },
+  { theta: -Math.PI/4, phi: 0.35,  label: '竞赛活动', href: 'activities.html' },
+  { theta: Math.PI/4,  phi: -0.4,  label: '校园生活', href: 'university.html' },
+  { theta: Math.PI/2,  phi: 0.2,   label: '社团任职', href: 'clubs.html' },
+];
+
+const sphereDots = dotData.map(d => {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 })
+  );
+  mesh.userData = d;
+  const r = 1.2;
+  mesh.position.set(
+    r * Math.cos(d.phi) * Math.cos(d.theta),
+    r * Math.sin(d.phi),
+    r * Math.cos(d.phi) * Math.sin(d.theta)
+  );
+  sphereGroup.add(mesh);
+  return mesh;
+});
+
+const glowDots = sphereDots.map(d => {
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.35 });
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), glowMat);
+  glow.position.copy(d.position);
+  sphereGroup.add(glow);
+  return glow;
+});
+
+const originalDotPositions = sphereDots.map(d => d.position.clone());
+
+const screenPosMap = {
+  'Pawn':     { x: 0,    y: 0 },
+  '首页':     { x: -1,   y: 0 },
+  '试验地':   { x: -1.1, y: -0.3 },
+  '项目作品': { x: -0.7, y: -0.7 },
+  '获奖荣誉': { x: 0,    y: -1 },
+  '竞赛活动': { x: 0.7,  y: -0.7 },
+  '校园生活': { x: 0.7,  y: 0.7 },
+  '社团任职': { x: 0,    y: 1 },
+};
+
+const pageContentMap = {
+  'Pawn':     { title: 'Pawn', sub: 'PAWN SCENE' },
+  '首页':     { title: '陈怡丞 | 个人网站', sub: 'SOFTWARE ENGINEERING' },
+  '试验地':   { title: '试验地', sub: 'LABORATORY' },
+  '项目作品': { title: '项目作品', sub: 'PROJECTS' },
+  '获奖荣誉': { title: '获奖荣誉', sub: 'AWARDS' },
+  '竞赛活动': { title: '竞赛活动', sub: 'COMPETITIONS' },
+  '校园生活': { title: '校园生活', sub: 'CAMPUS LIFE' },
+  '社团任职': { title: '社团任职', sub: 'CLUBS' },
+};
+
+scene.add(new THREE.AmbientLight(0x112244, 1.2));
+const pointLight = new THREE.PointLight(0x00d4ff, 3, 15);
+pointLight.position.set(0, 0, 3);
+scene.add(pointLight);
+const fillLight = new THREE.PointLight(0x7b40ff, 1.5, 12);
+fillLight.position.set(-3, 2, -2);
+scene.add(fillLight);
+
+const PHASES = {
+  IDLE: 0,
+  BLACK_EXPAND: 1,
+  DOTS_ORBIT_IN: 2,
+  DOTS_ORBIT_SHRINK: 3,
+  SPHERE_FORM: 4,
+  SPHERE_EXPAND: 5,
+  DONE: 6,
+  TRANS_ROTATE_TO_SRC: 7,
+  TRANS_COLLAPSE: 8,
+  TRANS_ZOOM: 9,
+  TRANS_FLY_OUT: 10,
+  TRANS_FLY_IN: 11,
+  TRANS_ARRIVE: 12,
+};
+
+let phase = PHASES.IDLE;
+let phaseStart = 0;
+const phaseDurations = {
+  [PHASES.BLACK_EXPAND]: 0.6,
+  [PHASES.DOTS_ORBIT_IN]: 0.4,
+  [PHASES.DOTS_ORBIT_SHRINK]: 0.8,
+  [PHASES.SPHERE_FORM]: 1.2,
+  [PHASES.SPHERE_EXPAND]: 0.8,
+  [PHASES.TRANS_ROTATE_TO_SRC]: 0.8,
+  [PHASES.TRANS_COLLAPSE]: 0.7,
+  [PHASES.TRANS_ZOOM]: 0.5,
+  [PHASES.TRANS_FLY_OUT]: 0.7,
+  [PHASES.TRANS_FLY_IN]: 0.7,
+  [PHASES.TRANS_ARRIVE]: 1.6,
+};
+
+let sphereRotY = 0, sphereRotX = 0;
+let canvasGlobalAlpha = 1;
+let sphereGlobalAlpha = 0;
+
+let transSrcDot = null;
+let transTgtDot = null;
+// 用四元数插值代替Euler角插值，避免累积弧度导致的长路径旋转
+let transStartQuat = new THREE.Quaternion();
+let transTargetQuat = new THREE.Quaternion();
+let currentPageLabel = 'Pawn';
+let currentCenterDotLabel = 'Pawn'; // 追踪当前中心点
+let flyTrailPoints = [];
+let flyExitDir = { x: 0, y: 0 };
+
+// ===== Debug Panel Update =====
+const PHASE_NAMES = {
+  0:'IDLE', 1:'BLACK_EXPAND', 2:'DOTS_ORBIT_IN', 3:'DOTS_ORBIT_SHRINK',
+  4:'SPHERE_FORM', 5:'SPHERE_EXPAND', 6:'DONE', 7:'TRANS_ROTATE_TO_SRC',
+  8:'TRANS_COLLAPSE', 9:'TRANS_ZOOM', 10:'TRANS_FLY_OUT', 11:'TRANS_FLY_IN', 12:'TRANS_ARRIVE'
+};
+
+const DOT_COUNT = 8;
+const dotAngles = [];
+for (let i = 0; i < DOT_COUNT; i++) dotAngles.push(i * Math.PI * 2 / DOT_COUNT);
+
+const dotStartPos = [];
+function generateDotStarts() {
+  dotStartPos.length = 0;
+  const cx = CX(), cy = CY();
+  const edges = [
+    { x: -60, y: cy - 200 },
+    { x: W() + 60, y: cy - 240 },
+    { x: -80, y: cy + 180 },
+    { x: W() + 80, y: cy + 220 },
+    { x: cx - 100, y: -60 },
+    { x: cx + 100, y: H() + 60 },
+    { x: -60, y: cy + 20 },
+    { x: W() + 60, y: cy - 30 },
+  ];
+  edges.forEach(e => dotStartPos.push({ x: e.x, y: e.y }));
+}
+generateDotStarts();
+
+let trailHistory = [];
+for (let i = 0; i < DOT_COUNT; i++) trailHistory.push([]);
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+}
+function easeOutCubic(t) { return 1 - Math.pow(1-t, 3); }
+
+function startPhase(p) {
+  phase = p;
+  phaseStart = performance.now() / 1000;
+  const labels = {
+    [PHASES.BLACK_EXPAND]: '黑色从屏幕中心向外扩散 …',
+    [PHASES.DOTS_ORBIT_IN]: '8 个光点从四周飞向轨道 …',
+    [PHASES.DOTS_ORBIT_SHRINK]: '轨道收缩 · 加速旋转 · 拖尾增强 …',
+    [PHASES.SPHERE_FORM]: '光点汇聚成 3D 导航球 …',
+    [PHASES.SPHERE_EXPAND]: '球体扩散，加载目标页面 …',
+    [PHASES.IDLE]: '点击按钮触发正向转场动画',
+    [PHASES.DONE]: '双击球旋转 · 悬停光点查看 · 单击跳转',
+    [PHASES.TRANS_ROTATE_TO_SRC]: '球体旋转，定位当前页面 …',
+    [PHASES.TRANS_COLLAPSE]: '超新星式收回 …',
+    [PHASES.TRANS_ZOOM]: '光源放大，聚焦 …',
+    [PHASES.TRANS_FLY_OUT]: '飞行中 → ' + (transTgtDot ? transTgtDot.userData.label : ''),
+    [PHASES.TRANS_FLY_IN]: '接近目标 …',
+    [PHASES.TRANS_ARRIVE]: '超新星式加载 …',
+  };
+  statusEl.textContent = labels[p] || '';
+}
+
+function drawDot(x, y, size, alpha, trail) {
+  if (trail && trail.length > 1) {
+    for (let i = 1; i < trail.length; i++) {
+      const ta = (i / trail.length) * 0.5 * alpha;
+      const ts = size * (i / trail.length) * 0.6;
+      ctx.beginPath();
+      ctx.arc(trail[i].x, trail[i].y, Math.max(0.5, ts), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0, 212, 255, ${ta})`;
+      ctx.fill();
+    }
+  }
+
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, size * 4);
+  grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+  grad.addColorStop(0.15, `rgba(0, 212, 255, ${alpha * 0.8})`);
+  grad.addColorStop(0.4, `rgba(0, 212, 255, ${alpha * 0.3})`);
+  grad.addColorStop(1, `rgba(0, 212, 255, 0)`);
+  ctx.beginPath();
+  ctx.arc(x, y, size * 4, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  ctx.fill();
+
+  ctx.shadowColor = 'rgba(0, 212, 255, 0.8)';
+  ctx.shadowBlur = 30;
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.8, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(0, 212, 255, ${alpha * 0.6})`;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+let currentOrbitAngle = 0;
+
+// ===== Orbit Control (manual) =====
+let orbitMode = false;
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let orbitTheta = 0;
+let orbitPhi = Math.PI / 2;
+let orbitRadius = 6;
+let orbitTargetTheta = 0;
+let orbitTargetPhi = Math.PI / 2;
+let orbitStartTheta = 0; // 记录进入orbit时的初始角度
+let orbitStartPhi = Math.PI / 2;
+let autoRotateSpeed = 0.004;
+
+const ORBIT_MIN_PHI = 0.3;
+const ORBIT_MAX_PHI = Math.PI - 0.3;
+
+function updateCameraFromOrbit() {
+  camera.position.x = orbitRadius * Math.sin(orbitPhi) * Math.sin(orbitTheta);
+  camera.position.y = orbitRadius * Math.cos(orbitPhi);
+  camera.position.z = orbitRadius * Math.sin(orbitPhi) * Math.cos(orbitTheta);
+  camera.lookAt(0, 0, 0);
+}
+
+// ===== Raycaster =====
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredDot = null;
+let clickTimeout = null;
+
+function getDotFacing(dotMesh) {
+  const dotWorldPos = new THREE.Vector3();
+  dotMesh.getWorldPosition(dotWorldPos);
+  const sphereCenter = new THREE.Vector3();
+  sphereGroup.getWorldPosition(sphereCenter);
+  const outward = dotWorldPos.clone().sub(sphereCenter).normalize();
+  const viewDir = camera.position.clone().sub(dotWorldPos).normalize();
+  return outward.dot(viewDir);
+}
+
+function isDotOccluded(dotMesh) {
+  return getDotFacing(dotMesh) < -0.1;
+}
+
+function getIntersectedDot(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(sphereDots);
+  for (const hit of intersects) {
+    if (!isDotOccluded(hit.object)) return hit.object;
+  }
+  return null;
+}
+
+function getIntersectedSphere(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const allObjects = [solidShell, ...sphereDots];
+  const intersects = raycaster.intersectObjects(allObjects);
+  return intersects.length > 0;
+}
+
+function projectToScreen(obj) {
+  const vec = new THREE.Vector3();
+  obj.getWorldPosition(vec);
+  vec.project(camera);
+  return {
+    x: (vec.x * 0.5 + 0.5) * W(),
+    y: (-vec.y * 0.5 + 0.5) * H(),
+    z: vec.z
+  };
+}
+
+// ===== Event Handlers =====
+function onPointerDown(e) {
+  if (phase !== PHASES.DONE) return;
+  if (orbitMode) {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    sphereLayer.setPointerCapture(e.pointerId);
+  }
+}
+
+function onPointerMove(e) {
+  if (phase !== PHASES.DONE) return;
+
+  if (orbitMode && isDragging) {
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    orbitTargetTheta -= dx * 0.008;
+    orbitTargetPhi += dy * 0.008;
+    orbitTargetPhi = Math.max(ORBIT_MIN_PHI, Math.min(ORBIT_MAX_PHI, orbitTargetPhi));
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    return;
+  }
+
+  const hit = getIntersectedDot(e);
+  if (hit !== hoveredDot) {
+    hoveredDot = hit;
+    if (hoveredDot) {
+      renderer.domElement.style.cursor = 'pointer';
+    } else {
+      renderer.domElement.style.cursor = 'default';
+    }
+  }
+}
+
+function onPointerUp(e) {
+  isDragging = false;
+  sphereLayer.releasePointerCapture(e.pointerId);
+}
+
+function onDblClick(e) {
+  if (phase !== PHASES.DONE) return;
+
+  const hitSphere = getIntersectedSphere(e);
+  if (!hitSphere) return;
+
+  orbitMode = !orbitMode;
+  if (orbitMode) {
+    sphereLayer.style.pointerEvents = 'auto';
+    orbitHint.classList.add('visible');
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    orbitTheta = Math.atan2(camera.position.x, camera.position.z);
+    orbitPhi = Math.acos(camera.position.y / orbitRadius);
+    orbitTargetTheta = orbitTheta;
+    orbitTargetPhi = orbitPhi;
+    // 记录进入orbit时的初始角度，用于后续计算增量
+    orbitStartTheta = orbitTheta;
+    orbitStartPhi = orbitPhi;
+  } else {
+    orbitHint.classList.remove('visible');
+    sphereLayer.style.pointerEvents = 'auto';
+  }
+}
+
+function onClick(e) {
+  if (phase !== PHASES.DONE) return;
+
+  if (clickTimeout) {
+    clearTimeout(clickTimeout);
+    clickTimeout = null;
+    return;
+  }
+
+  clickTimeout = setTimeout(() => {
+    clickTimeout = null;
+    const hit = getIntersectedDot(e);
+    if (hit && hit.userData.label !== currentPageLabel) {
+      startNavigationTransition(hit);
+    }
+  }, 300);
+}
+
+function startNavigationTransition(tgtDot) {
+  transTgtDot = tgtDot;
+  transSrcDot = sphereDots.find(d => d.userData.label === currentCenterDotLabel) || sphereDots[0];
+
+  // 如果在orbit模式，将相机位置转换为等效的球体旋转
+  if (orbitMode) {
+    const deltaTheta = orbitTheta - orbitStartTheta;
+    const deltaPhi = orbitPhi - orbitStartPhi;
+    sphereRotY = sphereRotY - deltaTheta;
+    sphereRotX = sphereRotX - deltaPhi;
+    sphereGroup.rotation.y = sphereRotY;
+    sphereGroup.rotation.x = sphereRotX;
+    camera.position.set(0, 0, 6);
+    camera.lookAt(0, 0, 0);
+    orbitMode = false;
+    orbitHint.classList.remove('visible');
+  }
+
+  // 当前球体旋转的四元数
+  transStartQuat = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(sphereRotX, sphereRotY, 0, 'YXZ')
+  );
+
+  // 计算src点在当前旋转后的世界方向
+  const srcIdx = sphereDots.indexOf(transSrcDot);
+  const srcDir = originalDotPositions[srcIdx].clone().normalize();
+  const srcWorldDir = srcDir.clone().applyQuaternion(transStartQuat);
+  const targetDir = new THREE.Vector3(0, 0, 1);
+
+  // 计算从srcWorldDir到targetDir的增量旋转
+  const neededQuat = new THREE.Quaternion().setFromUnitVectors(srcWorldDir, targetDir);
+
+  // 目标总旋转 = neededQuat * currentQuat
+  transTargetQuat = neededQuat.clone().multiply(transStartQuat.clone());
+
+  // 确保走最短路径
+  if (transTargetQuat.dot(transStartQuat) < 0) {
+    transTargetQuat.negate();
+  }
+
+  dotLabelEl.classList.remove('visible');
+  hoveredDot = null;
+  renderer.domElement.style.cursor = 'default';
+
+  startPhase(PHASES.TRANS_ROTATE_TO_SRC);
+}
+
+sphereLayer.addEventListener('pointerdown', onPointerDown);
+sphereLayer.addEventListener('pointermove', onPointerMove);
+sphereLayer.addEventListener('pointerup', onPointerUp);
+sphereLayer.addEventListener('dblclick', onDblClick);
+sphereLayer.addEventListener('click', onClick);
+
+// ===== Main Loop =====
+function loop(ts) {
+  requestAnimationFrame(loop);
+
+  if (phase === PHASES.IDLE) return;
+
+  if (phase === PHASES.DONE) {
+    if (orbitMode) {
+      orbitTheta += (orbitTargetTheta - orbitTheta) * 0.12;
+      orbitPhi += (orbitTargetPhi - orbitPhi) * 0.12;
+      updateCameraFromOrbit();
+    } else {
+      sphereRotY += autoRotateSpeed;
+      sphereGroup.rotation.y = sphereRotY;
+      sphereGroup.rotation.x = sphereRotX;
+      ring.rotation.z += 0.003;
+      ring2.rotation.z -= 0.002;
+    }
+
+    // Hover + occlusion effects
+    for (let i = 0; i < sphereDots.length; i++) {
+      const dot = sphereDots[i];
+      const glow = glowDots[i];
+      const isHovered = dot === hoveredDot;
+      const facing = getDotFacing(dot);
+      const occludeFactor = THREE.MathUtils.smoothstep(facing, -0.4, 0.3);
+      const targetScale = isHovered ? 1.3 : 1;
+      const currentScale = dot.scale.x;
+      const newScale = currentScale + (targetScale - currentScale) * 0.15;
+      dot.scale.setScalar(newScale);
+      glow.scale.setScalar(newScale * 1.6);
+
+      if (isHovered) {
+        dot.material.color.setHex(0x00ffff);
+        dot.material.opacity = 0.4 + occludeFactor * 0.6;
+        glow.material.opacity = 0.15 + occludeFactor * 0.45;
+      } else if (hoveredDot) {
+        dot.material.color.setHex(0x888899);
+        dot.material.opacity = 0.15 + occludeFactor * 0.35;
+        glow.material.opacity = 0.03 + occludeFactor * 0.07;
+      } else {
+        const r = Math.round(0x33 + (0xff - 0x33) * occludeFactor);
+        const g = Math.round(0x44 + (0xff - 0x44) * occludeFactor);
+        const b = Math.round(0x55 + (0xff - 0x55) * occludeFactor);
+        dot.material.color.setRGB(r / 255, g / 255, b / 255);
+        dot.material.opacity = 0.12 + occludeFactor * 0.88;
+        glow.material.opacity = 0.02 + occludeFactor * 0.33;
+      }
+    }
+
+    // Label
+    if (hoveredDot) {
+      const screenPos = projectToScreen(hoveredDot);
+      if (screenPos.z < 1) {
+        dotLabelEl.textContent = hoveredDot.userData.label;
+        dotLabelEl.style.left = (screenPos.x + 18) + 'px';
+        dotLabelEl.style.top = (screenPos.y - 14) + 'px';
+        dotLabelEl.classList.add('visible');
+      } else {
+        dotLabelEl.classList.remove('visible');
+      }
+    } else {
+      dotLabelEl.classList.remove('visible');
+    }
+
+    renderer.render(scene, camera);
+    return;
+  }
+
+  const elapsed = ts / 1000 - phaseStart;
+  const dur = phaseDurations[phase];
+  const tRaw = Math.min(1, elapsed / dur);
+
+  switch (phase) {
+    case PHASES.BLACK_EXPAND: {
+      const ep = easeInOutCubic(tRaw);
+      const maxR = Math.sqrt(W()**2 + H()**2);
+      const r = ep * maxR * 0.7;
+      blackOverlay.style.clipPath = `circle(${r}px at 50% 50%)`;
+      dotsCanvas.style.opacity = Math.min(1, tRaw * 3);
+      canvasGlobalAlpha = Math.min(1, tRaw * 3);
+      if (tRaw >= 1) startPhase(PHASES.DOTS_ORBIT_IN);
+      break;
+    }
+
+    case PHASES.DOTS_ORBIT_IN: {
+      const ep = easeOutCubic(tRaw);
+      const cx = CX(), cy = CY();
+      const R_max = W() * 0.30;
+
+      ctx.clearRect(0, 0, dotsCanvas.width, dotsCanvas.height);
+      ctx.globalAlpha = canvasGlobalAlpha;
+
+      for (let i = 0; i < DOT_COUNT; i++) {
+        const start = dotStartPos[i];
+        const angle = dotAngles[i];
+        const orbitX = cx + R_max * Math.cos(angle);
+        const orbitY = cy + R_max * Math.sin(angle);
+        const x = start.x + (orbitX - start.x) * ep;
+        const y = start.y + (orbitY - start.y) * ep;
+        trailHistory[i].push({ x, y });
+        if (trailHistory[i].length > 8) trailHistory[i].shift();
+        drawDot(x, y, 4, 1, trailHistory[i]);
+      }
+
+      if (tRaw >= 1) {
+        currentOrbitAngle = 0;
+        trailHistory = trailHistory.map(() => []);
+        startPhase(PHASES.DOTS_ORBIT_SHRINK);
+      }
+      break;
+    }
+
+    case PHASES.DOTS_ORBIT_SHRINK: {
+      const ep = easeInOutCubic(tRaw);
+      const cx = CX(), cy = CY();
+      const R_max = W() * 0.30;
+      const R_min = W() * 0.08;
+      const R = R_max - (R_max - R_min) * ep;
+
+      const baseSpeed = 2.5;
+      const maxSpeed = 18;
+      const omega = baseSpeed + (maxSpeed - baseSpeed) * ep * ep;
+      currentOrbitAngle += omega * (1/60);
+
+      ctx.clearRect(0, 0, dotsCanvas.width, dotsCanvas.height);
+
+      const fadeOutStart = 0.75;
+      if (tRaw > fadeOutStart) {
+        canvasGlobalAlpha = 1 - ((tRaw - fadeOutStart) / (1 - fadeOutStart));
+      }
+      ctx.globalAlpha = canvasGlobalAlpha;
+
+      const sortedDots = [];
+      for (let i = 0; i < DOT_COUNT; i++) {
+        const angle = dotAngles[i] + currentOrbitAngle;
+        const x = cx + R * Math.cos(angle);
+        const y = cy + R * Math.sin(angle);
+        const depth = Math.sin(angle);
+        sortedDots.push({ x, y, depth, idx: i });
+      }
+      sortedDots.sort((a, b) => a.depth - b.depth);
+
+      for (const dot of sortedDots) {
+        const depthFactor = (dot.depth + 1) / 2;
+        const size = 3 + depthFactor * 3;
+        const alpha = 0.4 + depthFactor * 0.6;
+        trailHistory[dot.idx].push({ x: dot.x, y: dot.y });
+        const maxTrail = Math.floor(5 + omega * 1.5);
+        while (trailHistory[dot.idx].length > maxTrail) trailHistory[dot.idx].shift();
+        drawDot(dot.x, dot.y, size, alpha, trailHistory[dot.idx]);
+      }
+
+      if (tRaw > fadeOutStart) {
+        sphereGlobalAlpha = (tRaw - fadeOutStart) / (1 - fadeOutStart);
+        sphereLayer.style.opacity = sphereGlobalAlpha;
+      }
+
+      if (tRaw >= 1) {
+        dotsCanvas.style.opacity = '0';
+        canvasGlobalAlpha = 0;
+        sphereLayer.style.opacity = '1';
+        sphereGlobalAlpha = 1;
+        solidMat.opacity = 0.05;
+        wireMat.opacity = 0.02;
+        innerMat.opacity = 0.02;
+        sphereDots.forEach(d => d.scale.setScalar(0.3));
+        glowDots.forEach(g => g.scale.setScalar(0.3));
+        startPhase(PHASES.SPHERE_FORM);
+      }
+      break;
+    }
+
+    case PHASES.SPHERE_FORM: {
+      const ep = easeInOutCubic(tRaw);
+      const startSpeed = 0.18;
+      const endSpeed = 0.004;
+      const rotSpeed = startSpeed - (startSpeed - endSpeed) * ep;
+      sphereRotY += rotSpeed;
+      sphereRotX += rotSpeed * 0.3;
+      sphereGroup.rotation.y = sphereRotY;
+      sphereGroup.rotation.x = sphereRotX;
+      ring.rotation.z += rotSpeed * 0.8;
+      ring2.rotation.z -= rotSpeed * 0.6;
+
+      solidMat.opacity = 0.05 + ep * 0.50;
+      wireMat.opacity = 0.02 + ep * 0.10;
+      innerMat.opacity = 0.02 + ep * 0.02;
+
+      const dotScale = 0.3 + ep * 0.7;
+      sphereDots.forEach(d => d.scale.setScalar(dotScale));
+      glowDots.forEach(g => g.scale.setScalar(dotScale * 1.6));
+
+      if (tRaw >= 1) startPhase(PHASES.SPHERE_EXPAND);
+      renderer.render(scene, camera);
+      break;
+    }
+
+    case PHASES.SPHERE_EXPAND: {
+      const ep = easeInOutCubic(tRaw);
+      const maxR = Math.sqrt(W()**2 + H()**2);
+      const startR = maxR * 0.7;
+      const r = startR * (1 - ep);
+      blackOverlay.style.clipPath = `circle(${r}px at 50% 50%)`;
+
+      pageA.style.visibility = 'hidden';
+      pageA.style.opacity = '0';
+      pageB.style.visibility = 'visible';
+      pageB.style.opacity = ep;
+
+      sphereRotY += 0.004;
+      sphereGroup.rotation.y = sphereRotY;
+      ring.rotation.z += 0.003;
+      ring2.rotation.z -= 0.002;
+      renderer.render(scene, camera);
+
+      if (tRaw >= 1) {
+        blackOverlay.style.clipPath = 'circle(0px at 50% 50%)';
+        pageB.style.opacity = '1';
+        sphereLayer.style.opacity = '1';
+        sphereLayer.style.pointerEvents = 'auto';
+        currentPageLabel = '项目作品';
+        currentCenterDotLabel = '项目作品';
+        startPhase(PHASES.DONE);
+      }
+      break;
+    }
+
+    case PHASES.TRANS_ROTATE_TO_SRC: {
+      const ep = easeInOutCubic(tRaw);
+      // 用四元数slerp插值，保证最短路径旋转
+      const interpQuat = transStartQuat.clone().slerp(transTargetQuat.clone(), ep);
+      const interpEuler = new THREE.Euler().setFromQuaternion(interpQuat, 'YXZ');
+      sphereGroup.rotation.set(interpEuler.x, interpEuler.y, interpEuler.z);
+      sphereGroup.rotation.order = 'YXZ';
+      sphereRotY = interpEuler.y;
+      sphereRotX = interpEuler.x;
+
+      ring.rotation.z += 0.003 * (1 - ep);
+      ring2.rotation.z -= 0.002 * (1 - ep);
+
+      // 源点（当前中心点）亮度插值到流星高亮，其他点逐渐透明
+      for (let i = 0; i < sphereDots.length; i++) {
+        const dot = sphereDots[i];
+        const glow = glowDots[i];
+        if (dot === transSrcDot) {
+          // 源点：保持亮白色，glow变为青色+放大+增亮
+          dot.material.color.setRGB(0.7, 0.7, 0.7); // 暗白
+          dot.scale.setScalar(1); // 不放大
+          glow.scale.setScalar(3); // glow放大，形成青色圈
+          glow.material.opacity = 0.2 + ep * 0.3; // 降低亮度
+          glow.material.color.setRGB(0, 0.83, 1); // 青色glow
+        } else {
+          // 其他点：逐渐透明
+          dot.material.opacity = Math.max(0, 1 - ep * 2);
+          glow.material.opacity = Math.max(0, 0.35 * (1 - ep * 2));
+        }
+      }
+
+      if (tRaw >= 1) {
+        const finalEuler = new THREE.Euler().setFromQuaternion(transTargetQuat, 'YXZ');
+        sphereGroup.rotation.set(finalEuler.x, finalEuler.y, finalEuler.z);
+        sphereGroup.rotation.order = 'YXZ';
+        sphereRotY = finalEuler.y;
+        sphereRotX = finalEuler.x;
+        startPhase(PHASES.TRANS_COLLAPSE);
+      }
+      renderer.render(scene, camera);
+      break;
+    }
+
+    case PHASES.TRANS_COLLAPSE: {
+      const ep = easeInOutCubic(tRaw);
+      const scale = 1 - ep * 0.92;
+      sphereGroup.scale.setScalar(Math.max(0.01, scale));
+
+      const srcIdx = sphereDots.indexOf(transSrcDot);
+      const srcLocalPos = originalDotPositions[srcIdx].clone();
+
+      for (let i = 0; i < sphereDots.length; i++) {
+        const dot = sphereDots[i];
+        const glow = glowDots[i];
+        if (dot === transSrcDot) {
+          // 源点保持原大小，保持白色
+          dot.scale.setScalar(1);
+          glow.scale.setScalar(3);
+          glow.material.opacity = 0.5;
+          dot.material.opacity = 1;
+          dot.material.color.setRGB(0.7, 0.7, 0.7); // 暗白
+          glow.material.color.setRGB(0, 0.83, 1); // 青色glow
+        } else {
+          // 其他点：保持透明，向源点聚拢
+          const target = srcLocalPos.clone();
+          dot.position.lerpVectors(originalDotPositions[i], target, ep * 0.8);
+          glow.position.copy(dot.position);
+          dot.material.opacity = 0;
+          glow.material.opacity = 0;
+        }
+      }
+
+      solidMat.color.lerp(new THREE.Color(0xffffff), ep * 0.6);
+      solidMat.opacity = Math.max(0, 0.55 - ep * 0.4);
+      wireMat.opacity = Math.max(0, 0.12 * (1 - ep));
+      ring.material.opacity = Math.max(0, 0.5 * (1 - ep));
+      ring2.material.opacity = Math.max(0, 0.25 * (1 - ep));
+
+      if (tRaw >= 1) {
+        startPhase(PHASES.TRANS_ZOOM);
+      }
+      renderer.render(scene, camera);
+      break;
+    }
+
+    case PHASES.TRANS_ZOOM: {
+      const ep = easeInOutCubic(tRaw);
+
+      // 源点保持原大小
+      transSrcDot.scale.setScalar(1);
+      const srcIdx = sphereDots.indexOf(transSrcDot);
+      glowDots[srcIdx].scale.setScalar(3);
+      glowDots[srcIdx].material.color.setRGB(0, 0.83, 1); // 青色圈
+      glowDots[srcIdx].material.opacity = 0.5;
+      transSrcDot.material.color.setRGB(0.7, 0.7, 0.7); // 暗白
+
+      solidMat.opacity = Math.max(0, 0.15 * (1 - ep));
+      wireMat.opacity = 0;
+      innerMat.opacity = 0;
+      ring.material.opacity = 0;
+      ring2.material.opacity = 0;
+
+      for (let i = 0; i < sphereDots.length; i++) {
+        if (sphereDots[i] !== transSrcDot) {
+          sphereDots[i].material.opacity = 0;
+          glowDots[i].material.opacity = 0;
+        }
+      }
+
+      sphereGroup.scale.setScalar(Math.max(0.01, 0.08 * (1 - ep * 0.8)));
+
+      blackOverlay.style.clipPath = `circle(${ep * 100}% at 50% 50%)`;
+      blackOverlay.style.background = '#000';
+
+      if (tRaw >= 1) {
+        sphereLayer.style.opacity = '0';
+        flyCanvasEl.style.opacity = '1';
+
+        const srcSp = screenPosMap[transSrcDot.userData.label] || { x: 0, y: 0 };
+        const tgtSp = screenPosMap[transTgtDot.userData.label] || { x: 0, y: 0 };
+        const dx = tgtSp.x - srcSp.x;
+        const dy = tgtSp.y - srcSp.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        flyExitDir = { x: dx / len, y: dy / len };
+        flyTrailPoints = [];
+
+        startPhase(PHASES.TRANS_FLY_OUT);
+      }
+      renderer.render(scene, camera);
+      break;
+    }
+
+    case PHASES.TRANS_FLY_OUT: {
+      const ep = easeInOutCubic(tRaw);
+      const cx = CX(), cy = CY();
+      const dist = Math.max(W(), H()) * 0.9;
+
+      const exitX = cx + flyExitDir.x * dist * ep;
+      const exitY = cy + flyExitDir.y * dist * ep;
+
+      const curveOffset = Math.sin(ep * Math.PI) * 120;
+      const perpX = -flyExitDir.y;
+      const perpY = flyExitDir.x;
+      const px = exitX + perpX * curveOffset;
+      const py = exitY + perpY * curveOffset;
+
+      flyCtx.clearRect(0, 0, flyCanvasEl.width, flyCanvasEl.height);
+
+      flyTrailPoints.push({ x: px, y: py });
+      if (flyTrailPoints.length > 25) flyTrailPoints.shift();
+
+      for (let i = 0; i < flyTrailPoints.length; i++) {
+        const tp = flyTrailPoints[i];
+        const ta = (i / flyTrailPoints.length) * 0.4;
+        const ts = 2 + (i / flyTrailPoints.length) * 6;
+        const grad = flyCtx.createRadialGradient(tp.x, tp.y, 0, tp.x, tp.y, ts * 3);
+        grad.addColorStop(0, `rgba(0, 212, 255, ${ta})`);
+        grad.addColorStop(1, 'rgba(0, 212, 255, 0)');
+        flyCtx.beginPath();
+        flyCtx.arc(tp.x, tp.y, ts * 3, 0, Math.PI * 2);
+        flyCtx.fillStyle = grad;
+        flyCtx.fill();
+      }
+
+      const mainSize = 8 + ep * 6;
+      const grad = flyCtx.createRadialGradient(px, py, 0, px, py, mainSize * 5);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.15, 'rgba(0, 212, 255, 0.9)');
+      grad.addColorStop(0.4, 'rgba(0, 212, 255, 0.3)');
+      grad.addColorStop(1, 'rgba(0, 212, 255, 0)');
+      flyCtx.beginPath();
+      flyCtx.arc(px, py, mainSize * 5, 0, Math.PI * 2);
+      flyCtx.fillStyle = grad;
+      flyCtx.fill();
+
+      flyCtx.beginPath();
+      flyCtx.arc(px, py, mainSize, 0, Math.PI * 2);
+      flyCtx.fillStyle = '#fff';
+      flyCtx.fill();
+
+      if (tRaw >= 1) {
+        flyTrailPoints = [];
+        startPhase(PHASES.TRANS_FLY_IN);
+      }
+      break;
+    }
+
+    case PHASES.TRANS_FLY_IN: {
+      const ep = easeInOutCubic(tRaw);
+      const cx = CX(), cy = CY();
+      const dist = Math.max(W(), H()) * 0.9;
+
+      const mirrorDir = { x: -flyExitDir.x, y: flyExitDir.y };
+      const startX = cx + mirrorDir.x * dist;
+      const startY = cy + mirrorDir.y * dist;
+
+      const linX = startX + (cx - startX) * ep;
+      const linY = startY + (cy - startY) * ep;
+
+      const curveOffset = Math.sin(ep * Math.PI) * 100;
+      const perpX = -mirrorDir.y;
+      const perpY = mirrorDir.x;
+      const px = linX + perpX * curveOffset;
+      const py = linY + perpY * curveOffset;
+
+      flyCtx.clearRect(0, 0, flyCanvasEl.width, flyCanvasEl.height);
+
+      flyTrailPoints.push({ x: px, y: py });
+      if (flyTrailPoints.length > 25) flyTrailPoints.shift();
+
+      for (let i = 0; i < flyTrailPoints.length; i++) {
+        const tp = flyTrailPoints[i];
+        const ta = (i / flyTrailPoints.length) * 0.4;
+        const ts = 2 + (i / flyTrailPoints.length) * 6;
+        const grad = flyCtx.createRadialGradient(tp.x, tp.y, 0, tp.x, tp.y, ts * 3);
+        grad.addColorStop(0, `rgba(0, 212, 255, ${ta})`);
+        grad.addColorStop(1, 'rgba(0, 212, 255, 0)');
+        flyCtx.beginPath();
+        flyCtx.arc(tp.x, tp.y, ts * 3, 0, Math.PI * 2);
+        flyCtx.fillStyle = grad;
+        flyCtx.fill();
+      }
+
+      const mainSize = 14 - ep * 6;
+      const grad = flyCtx.createRadialGradient(px, py, 0, px, py, mainSize * 5);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.15, 'rgba(0, 212, 255, 0.9)');
+      grad.addColorStop(0.4, 'rgba(0, 212, 255, 0.3)');
+      grad.addColorStop(1, 'rgba(0, 212, 255, 0)');
+      flyCtx.beginPath();
+      flyCtx.arc(px, py, mainSize * 5, 0, Math.PI * 2);
+      flyCtx.fillStyle = grad;
+      flyCtx.fill();
+
+      flyCtx.beginPath();
+      flyCtx.arc(px, py, mainSize, 0, Math.PI * 2);
+      flyCtx.fillStyle = '#fff';
+      flyCtx.fill();
+
+      if (tRaw >= 1) {
+        flyCanvasEl.style.opacity = '0';
+        flyCtx.clearRect(0, 0, flyCanvasEl.width, flyCanvasEl.height);
+
+        const tgtLabel = transTgtDot.userData.label;
+        const content = pageContentMap[tgtLabel] || { title: tgtLabel, sub: '' };
+        pageB.querySelector('.page-title').textContent = content.title;
+        pageB.querySelector('.page-sub').textContent = content.sub;
+
+        // 进入ARRIVE前：全黑屏状态
+        blackOverlay.style.clipPath = 'none';
+        blackOverlay.style.background = '#000';
+        pageB.style.clipPath = 'circle(0px at 50% 50%)';
+        pageB.style.visibility = 'visible';
+        pageB.style.opacity = '1';
+
+        // 恢复球体可见性，初始状态为透明（将在ARRIVE中逐渐恢复）
+        sphereLayer.style.opacity = '1';
+        sphereGroup.scale.setScalar(1);
+        // 旋转球体使目标点面向相机(+Z)
+        const tgtIdx = sphereDots.indexOf(transTgtDot);
+        const tgtDir = originalDotPositions[tgtIdx].clone().normalize();
+        const faceCamQuat = new THREE.Quaternion().setFromUnitVectors(tgtDir, new THREE.Vector3(0, 0, 1));
+        const faceCamEuler = new THREE.Euler().setFromQuaternion(faceCamQuat, 'YXZ');
+        sphereGroup.rotation.set(faceCamEuler.x, faceCamEuler.y, faceCamEuler.z);
+        sphereGroup.rotation.order = 'YXZ';
+        sphereRotY = faceCamEuler.y;
+        sphereRotX = faceCamEuler.x;
+        // 初始状态：所有点透明，框架透明
+        for (let i = 0; i < sphereDots.length; i++) {
+          sphereDots[i].position.copy(originalDotPositions[i]);
+          glowDots[i].position.copy(originalDotPositions[i]);
+          sphereDots[i].material.opacity = 0;
+          glowDots[i].material.opacity = 0;
+          if (sphereDots[i] === transTgtDot) {
+            sphereDots[i].material.color.setRGB(0.7, 0.7, 0.7); // 暗白
+            sphereDots[i].scale.setScalar(1); // 不放大
+            glowDots[i].scale.setScalar(3); // glow放大，形成明显的青色圈
+            glowDots[i].material.color.setRGB(0, 0.83, 1); // 青色圈
+          } else {
+            sphereDots[i].scale.setScalar(1);
+            sphereDots[i].material.color.setHex(0xffffff);
+            glowDots[i].scale.setScalar(1.6);
+          }
+        }
+        solidMat.color.set(0x041828);
+        solidMat.opacity = 0;
+        wireMat.opacity = 0;
+        ring.material.opacity = 0;
+        ring2.material.opacity = 0;
+
+        startPhase(PHASES.TRANS_ARRIVE);
+      }
+      break;
+    }
+
+    case PHASES.TRANS_ARRIVE: {
+      const ep = easeInOutCubic(tRaw);
+      const maxR = Math.sqrt(W()**2 + H()**2);
+
+      // pageA隐藏，pageB可见（在黑屏后面）
+      pageA.style.visibility = 'hidden';
+      pageA.style.opacity = '0';
+      pageB.style.visibility = 'visible';
+      pageB.style.opacity = '1';
+      pageB.style.clipPath = 'none';
+
+      // 在blackOverlay上用mask-image挖洞：圆形内透明露出pageB，圆形外黑色遮挡
+      const revealR = ep * maxR;
+      blackOverlay.style.clipPath = 'none';
+      blackOverlay.style.background = '#000';
+      const maskGrad = `radial-gradient(circle at 50% 50%, transparent 0%, transparent ${revealR}px, black ${revealR}px)`;
+      blackOverlay.style.webkitMaskImage = maskGrad;
+      blackOverlay.style.maskImage = maskGrad;
+
+      // 球点逐渐从透明恢复到不透明（跟随超新星扩散进度）
+      for (let i = 0; i < sphereDots.length; i++) {
+        const dot = sphereDots[i];
+        const glow = glowDots[i];
+        if (dot === transTgtDot) {
+          // 目标点：中心保持亮白，glow为青色圈
+          dot.material.color.setRGB(0.7, 0.7, 0.7); // 暗白
+          dot.material.opacity = 1;
+          dot.scale.setScalar(1); // 保持原大小
+          glow.scale.setScalar(3 - ep * 1.4); // 从3缩回1.6，青色圈逐渐缩小
+          glow.material.color.setRGB(0, 0.83, 1); // 青色圈
+          glow.material.opacity = 0.5 - ep * 0.15; // 从0.5→0.35
+        } else {
+          // 其他点：从透明逐渐恢复
+          dot.material.opacity = Math.max(0, ep * 1.5 - 0.5); // ep<0.33时0，ep=1时1
+          glow.material.opacity = Math.max(0, (ep - 0.3) * 0.5); // ep<0.3时0，ep=1时0.35
+        }
+      }
+      // 球体框架也逐渐恢复
+      solidMat.opacity = Math.max(0, (ep - 0.3) * 0.55 / 0.7);
+      wireMat.opacity = Math.max(0, (ep - 0.4) * 0.12 / 0.6);
+      ring.material.opacity = Math.max(0, (ep - 0.5) * 0.5 / 0.5);
+      ring2.material.opacity = Math.max(0, (ep - 0.5) * 0.25 / 0.5);
+
+      // 独立图层ringCanvas(z-15)绘制像素方块风格圆环（粗像素，类圆非圆）
+      ringCtx.clearRect(0, 0, ringCanvasEl.width, ringCanvasEl.height);
+      if (ep < 0.97) {
+        const cx = CX(), cy = CY();
+        const outerR = revealR;
+        const thickness = 12 + (1 - ep) * 24; // 更厚，开始36px
+        const innerR = Math.max(0, outerR - thickness);
+        const px = 10; // 粗像素方块
+        const alpha = 1 - ep * 0.7;
+
+        // 沿圆周逐像素方块绘制
+        const step = px / Math.max(1, outerR);
+        for (let a = 0; a < Math.PI * 2; a += step) {
+          const cosA = Math.cos(a);
+          const sinA = Math.sin(a);
+
+          const rows = Math.max(1, Math.round(thickness / px));
+          for (let r = 0; r < rows; r++) {
+            const dist = innerR + (r + 0.5) * px;
+            if (dist > outerR) break;
+            const x = cx + cosA * dist;
+            const y = cy + sinA * dist;
+
+            const isMiddle = (r === Math.floor(rows / 2));
+            if (isMiddle) {
+              ringCtx.fillStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+            } else {
+              ringCtx.fillStyle = `rgba(0, 212, 255, ${0.85 * alpha})`;
+            }
+            ringCtx.fillRect(Math.floor(x / px) * px, Math.floor(y / px) * px, px, px);
+          }
+        }
+
+        // 外发光（粗像素）
+        const glowPx = 12;
+        const glowStep = glowPx / Math.max(1, outerR + 30);
+        for (let a = 0; a < Math.PI * 2; a += glowStep) {
+          const cosA = Math.cos(a);
+          const sinA = Math.sin(a);
+          for (let g = 1; g <= 2; g++) {
+            const gx = cx + cosA * (outerR + g * glowPx);
+            const gy = cy + sinA * (outerR + g * glowPx);
+            ringCtx.fillStyle = `rgba(0, 212, 255, ${0.2 * (1 - g / 3) * (1 - ep)})`;
+            ringCtx.fillRect(Math.floor(gx / glowPx) * glowPx, Math.floor(gy / glowPx) * glowPx, glowPx, glowPx);
+          }
+        }
+      }
+      ringCanvasEl.style.opacity = '1';
+
+      renderer.render(scene, camera);
+
+      if (tRaw >= 1) {
+        blackOverlay.style.clipPath = 'circle(0px at 50% 50%)';
+        blackOverlay.style.background = '#000';
+        blackOverlay.style.webkitMaskImage = '';
+        blackOverlay.style.maskImage = '';
+        ringCanvasEl.style.opacity = '0';
+        ringCtx.clearRect(0, 0, ringCanvasEl.width, ringCanvasEl.height);
+        dotsCanvas.style.opacity = '0';
+        ctx.clearRect(0, 0, dotsCanvas.width, dotsCanvas.height);
+
+        currentPageLabel = transTgtDot.userData.label;
+        currentCenterDotLabel = transTgtDot.userData.label;
+
+        // 确保最终状态正确
+        solidMat.color.set(0x041828);
+        solidMat.opacity = 0.55;
+        wireMat.opacity = 0.12;
+        innerMat.opacity = 0.04;
+        ring.material.opacity = 0.5;
+        ring2.material.opacity = 0.25;
+        ring.rotation.set(Math.PI / 2, 0, 0);
+        ring2.rotation.set(Math.PI / 3, Math.PI / 6, 0);
+
+        for (let i = 0; i < sphereDots.length; i++) {
+          sphereDots[i].position.copy(originalDotPositions[i]);
+          glowDots[i].position.copy(originalDotPositions[i]);
+          sphereDots[i].scale.setScalar(1);
+          sphereDots[i].material.color.setHex(0xffffff);
+          sphereDots[i].material.opacity = 1;
+          glowDots[i].scale.setScalar(1.6);
+          glowDots[i].material.opacity = 0.35;
+        }
+
+        sphereLayer.style.opacity = '1';
+        sphereLayer.style.pointerEvents = 'auto';
+        camera.position.set(0, 0, 6);
+        camera.lookAt(0, 0, 0);
+        orbitMode = false;
+        orbitHint.classList.remove('visible');
+
+        startPhase(PHASES.DONE);
+      }
+      break;
+    }
+  }
+}
+
+function reset() {
+  phase = PHASES.IDLE;
+  orbitMode = false;
+  isDragging = false;
+  hoveredDot = null;
+  transSrcDot = null;
+  transTgtDot = null;
+  flyTrailPoints = [];
+  currentCenterDotLabel = currentPageLabel; // 重置时同步中心点
+  blackOverlay.style.clipPath = 'circle(0px at 50% 50%)';
+  blackOverlay.style.background = '#000';
+  dotsCanvas.style.opacity = '0';
+  flyCanvasEl.style.opacity = '0';
+  sphereLayer.style.opacity = '0';
+  sphereLayer.style.pointerEvents = 'none';
+  pageA.style.visibility = 'visible';
+  pageA.style.opacity = '1';
+  pageB.style.visibility = 'hidden';
+  pageB.style.opacity = '0';
+  sphereRotY = 0; sphereRotX = 0;
+  sphereGroup.rotation.set(0,0,0);
+  sphereGroup.rotation.order = 'YXZ';
+  sphereGroup.scale.setScalar(1);
+  solidMat.color.set(0x041828);
+  solidMat.opacity = 0.55;
+  wireMat.opacity = 0.12;
+  innerMat.opacity = 0.04;
+  ring.material.opacity = 0.5;
+  ring2.material.opacity = 0.25;
+  ring.rotation.set(Math.PI/2,0,0);
+  ring2.rotation.set(Math.PI/3,Math.PI/6,0);
+  sphereDots.forEach((d, i) => {
+    d.position.copy(originalDotPositions[i]);
+    d.scale.setScalar(1);
+    d.material.color.setHex(0xffffff);
+    d.material.opacity = 1;
+  });
+  glowDots.forEach((g, i) => {
+    g.position.copy(originalDotPositions[i]);
+    g.scale.setScalar(1.6);
+    g.material.opacity = 0.35;
+  });
+  canvasGlobalAlpha = 1;
+  sphereGlobalAlpha = 0;
+  currentOrbitAngle = 0;
+  trailHistory = [];
+  for (let i = 0; i < DOT_COUNT; i++) trailHistory.push([]);
+  ctx.clearRect(0, 0, dotsCanvas.width, dotsCanvas.height);
+  flyCtx.clearRect(0, 0, flyCanvasEl.width, flyCanvasEl.height);
+  generateDotStarts();
+  dotLabelEl.classList.remove('visible');
+  orbitHint.classList.remove('visible');
+  camera.position.set(0, 0, 6);
+  camera.lookAt(0, 0, 0);
+  statusEl.textContent = '点击按钮触发正向转场动画';
+}
+
+function startTransition() {
+  if (phase !== PHASES.IDLE && phase !== PHASES.DONE) return;
+  reset();
+  setTimeout(() => startPhase(PHASES.BLACK_EXPAND), 100);
+}
+
+document.getElementById('btnStart').addEventListener('click', startTransition);
+document.getElementById('btnReset').addEventListener('click', reset);
+
+renderer.render(scene, camera);
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
